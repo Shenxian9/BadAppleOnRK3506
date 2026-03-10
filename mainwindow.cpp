@@ -31,10 +31,11 @@ MainWindow::MainWindow(QWidget *parent)
         return;
     }
 
-    m_player->setSource(QUrl::fromLocalFile(videoInfo.absoluteFilePath()));
-    connect(m_player, &QMediaPlayer::errorOccurred, this, [this](QMediaPlayer::Error, const QString &errorString) {
-        QMessageBox::critical(this, QStringLiteral("播放错误"), errorString);
-    });
+    m_player->setMedia(QUrl::fromLocalFile(videoInfo.absoluteFilePath()));
+    connect(m_player, static_cast<void (QMediaPlayer::*)(QMediaPlayer::Error)>(&QMediaPlayer::error), this,
+            [this](QMediaPlayer::Error) {
+                QMessageBox::critical(this, QStringLiteral("播放错误"), m_player->errorString());
+            });
 
     showFullScreen();
     m_player->play();
@@ -55,7 +56,7 @@ void MainWindow::mousePressEvent(QMouseEvent *event)
 
 void MainWindow::togglePlayback()
 {
-    if (m_player->playbackState() == QMediaPlayer::PlayingState) {
+    if (m_player->state() == QMediaPlayer::PlayingState) {
         m_player->pause();
     } else {
         m_player->play();

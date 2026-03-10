@@ -4,6 +4,7 @@
 #include <QMainWindow>
 
 class QMediaPlayer;
+class QMouseEvent;
 class QVideoWidget;
 
 class MainWindow : public QMainWindow
