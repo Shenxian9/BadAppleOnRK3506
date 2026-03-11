@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QPoint>
 #include <QStringList>
 
 class QMediaPlayer;
@@ -18,6 +19,9 @@ public:
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
+    void mouseDoubleClickEvent(QMouseEvent *event) override;
 
 private:
     bool loadVideoList();
@@ -25,11 +29,17 @@ private:
     void playNextVideo();
     void playPreviousVideo();
     void togglePlayback();
+    void setSystemVolume(int volumePercent);
 
     QMediaPlayer *m_player;
     QVideoWidget *m_videoWidget;
     QStringList m_videoFiles;
     int m_currentIndex;
+    int m_volumePercent;
+    QPoint m_pressPos;
+    QPoint m_lastMovePos;
+    bool m_isDragging;
+    bool m_volumeGestureTriggered;
 };
 
 #endif // MAINWINDOW_H

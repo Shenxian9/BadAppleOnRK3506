@@ -5,12 +5,15 @@
 #include <QMediaPlayer>
 #include <QMessageBox>
 #include <QMouseEvent>
+#include <QProcess>
 #include <QTimer>
 #include <QUrl>
 #include <QVideoWidget>
 
 namespace {
 const char kVideoDirectory[] = "/mnt/udisk";
+constexpr int kSwipeStepPixels = 12;
+constexpr int kVolumeStepPercent = 2;
 }
 
 MainWindow::MainWindow(QWidget *parent)
@@ -18,6 +21,9 @@ MainWindow::MainWindow(QWidget *parent)
     , m_player(new QMediaPlayer(this))
     , m_videoWidget(new QVideoWidget(this))
     , m_currentIndex(0)
+    , m_volumePercent(50)
+    , m_isDragging(false)
+    , m_volumeGestureTriggered(false)
 {
     setCentralWidget(m_videoWidget);
     m_player->setVideoOutput(m_videoWidget);
@@ -47,22 +53,78 @@ MainWindow::~MainWindow() = default;
 void MainWindow::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
-        const int thirdWidth = width() / 3;
-        const int x = event->pos().x();
-
-        if (x < thirdWidth) {
-            playPreviousVideo();
-        } else if (x < thirdWidth * 2) {
-            togglePlayback();
-        } else {
-            playNextVideo();
-        }
-
+        m_pressPos = event->pos();
+        m_lastMovePos = event->pos();
+        m_isDragging = true;
+        m_volumeGestureTriggered = false;
         event->accept();
         return;
     }
 
     QMainWindow::mousePressEvent(event);
+}
+
+void MainWindow::mouseMoveEvent(QMouseEvent *event)
+{
+    if (!m_isDragging || !(event->buttons() & Qt::LeftButton)) {
+        QMainWindow::mouseMoveEvent(event);
+        return;
+    }
+
+    const bool isRightHalf = m_pressPos.x() >= width() / 2;
+    if (!isRightHalf) {
+        m_lastMovePos = event->pos();
+        event->accept();
+        return;
+    }
+
+    const int deltaY = m_lastMovePos.y() - event->pos().y();
+    const int steps = deltaY / kSwipeStepPixels;
+    if (steps != 0) {
+        setSystemVolume(m_volumePercent + steps * kVolumeStepPercent);
+        m_lastMovePos.setY(m_lastMovePos.y() - steps * kSwipeStepPixels);
+        m_volumeGestureTriggered = true;
+    }
+
+    event->accept();
+}
+
+void MainWindow::mouseReleaseEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton && m_isDragging) {
+        const int thirdWidth = width() / 3;
+        const int releaseX = event->pos().x();
+
+        if (!m_volumeGestureTriggered) {
+            if (releaseX < thirdWidth) {
+                playPreviousVideo();
+            } else if (releaseX >= thirdWidth * 2) {
+                playNextVideo();
+            }
+        }
+
+        m_isDragging = false;
+        event->accept();
+        return;
+    }
+
+    QMainWindow::mouseReleaseEvent(event);
+}
+
+void MainWindow::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton) {
+        const int thirdWidth = width() / 3;
+        const int x = event->pos().x();
+
+        if (x >= thirdWidth && x < thirdWidth * 2) {
+            togglePlayback();
+            event->accept();
+            return;
+        }
+    }
+
+    QMainWindow::mouseDoubleClickEvent(event);
 }
 
 bool MainWindow::loadVideoList()
@@ -130,4 +192,12 @@ void MainWindow::togglePlayback()
     } else {
         m_player->play();
     }
+}
+
+void MainWindow::setSystemVolume(int volumePercent)
+{
+    m_volumePercent = qBound(0, volumePercent, 100);
+    QProcess::execute(QStringLiteral("amixer"),
+                      {QStringLiteral("-c"), QStringLiteral("0"), QStringLiteral("set"), QStringLiteral("Master"),
+                       QStringLiteral("%1%").arg(m_volumePercent)});
 }
