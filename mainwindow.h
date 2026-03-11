@@ -34,6 +34,7 @@ private:
     void playPreviousVideo();
     void togglePlayback();
     void setSystemVolume(int volumePercent);
+    void showPlaybackInfoHint();
     void showTransientHint(const QString &text);
     void updateHintGeometry();
 

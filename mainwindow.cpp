@@ -18,6 +18,29 @@ const char kVideoDirectory[] = "/mnt/udisk";
 constexpr int kSwipeStepPixels = 12;
 constexpr int kVolumeStepPercent = 2;
 constexpr int kHintAutoHideMs = 1200;
+
+QString formatTimeText(qint64 ms)
+{
+    if (ms < 0) {
+        return QStringLiteral("--:--");
+    }
+
+    const qint64 totalSeconds = ms / 1000;
+    const qint64 hours = totalSeconds / 3600;
+    const qint64 minutes = (totalSeconds % 3600) / 60;
+    const qint64 seconds = totalSeconds % 60;
+
+    if (hours > 0) {
+        return QStringLiteral("%1:%2:%3")
+            .arg(hours, 2, 10, QChar('0'))
+            .arg(minutes, 2, 10, QChar('0'))
+            .arg(seconds, 2, 10, QChar('0'));
+    }
+
+    return QStringLiteral("%1:%2")
+        .arg(minutes, 2, 10, QChar('0'))
+        .arg(seconds, 2, 10, QChar('0'));
+}
 }
 
 MainWindow::MainWindow(QWidget *parent)
@@ -113,6 +136,8 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event)
                 playPreviousVideo();
             } else if (releaseX >= thirdWidth * 2) {
                 playNextVideo();
+            } else {
+                showPlaybackInfoHint();
             }
         }
 
@@ -223,6 +248,18 @@ void MainWindow::setSystemVolume(int volumePercent)
                       {QStringLiteral("-c"), QStringLiteral("0"), QStringLiteral("set"), QStringLiteral("Master"),
                        QStringLiteral("%1%").arg(m_volumePercent)});
     showTransientHint(QStringLiteral("音量 %1%").arg(m_volumePercent));
+}
+
+void MainWindow::showPlaybackInfoHint()
+{
+    if (m_videoFiles.isEmpty()) {
+        return;
+    }
+
+    const QString fileName = QFileInfo(m_videoFiles.at(m_currentIndex)).fileName();
+    const QString positionText = formatTimeText(m_player->position());
+    const QString durationText = formatTimeText(m_player->duration());
+    showTransientHint(QStringLiteral("%1\n%2 / %3").arg(fileName, positionText, durationText));
 }
 
 void MainWindow::showTransientHint(const QString &text)
