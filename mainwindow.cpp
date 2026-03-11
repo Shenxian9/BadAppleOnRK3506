@@ -2,10 +2,13 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QFileInfo>
+#include <QLabel>
 #include <QMediaPlayer>
 #include <QMessageBox>
 #include <QMouseEvent>
 #include <QProcess>
+#include <QResizeEvent>
 #include <QTimer>
 #include <QUrl>
 #include <QVideoWidget>
@@ -14,12 +17,15 @@ namespace {
 const char kVideoDirectory[] = "/mnt/udisk";
 constexpr int kSwipeStepPixels = 12;
 constexpr int kVolumeStepPercent = 2;
+constexpr int kHintAutoHideMs = 1200;
 }
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , m_player(new QMediaPlayer(this))
     , m_videoWidget(new QVideoWidget(this))
+    , m_hintLabel(new QLabel(this))
+    , m_hintHideTimer(new QTimer(this))
     , m_currentIndex(0)
     , m_volumePercent(50)
     , m_isDragging(false)
@@ -27,6 +33,13 @@ MainWindow::MainWindow(QWidget *parent)
 {
     setCentralWidget(m_videoWidget);
     m_player->setVideoOutput(m_videoWidget);
+
+    m_hintLabel->setAlignment(Qt::AlignCenter);
+    m_hintLabel->setStyleSheet(QStringLiteral("QLabel { color: white; background-color: rgba(0, 0, 0, 150); border-radius: 8px; padding: 10px 18px; font-size: 20px; }"));
+    m_hintLabel->hide();
+
+    m_hintHideTimer->setSingleShot(true);
+    connect(m_hintHideTimer, &QTimer::timeout, m_hintLabel, &QLabel::hide);
 
     connect(m_player, static_cast<void (QMediaPlayer::*)(QMediaPlayer::Error)>(&QMediaPlayer::error), this,
             [this](QMediaPlayer::Error) {
@@ -127,6 +140,12 @@ void MainWindow::mouseDoubleClickEvent(QMouseEvent *event)
     QMainWindow::mouseDoubleClickEvent(event);
 }
 
+void MainWindow::resizeEvent(QResizeEvent *event)
+{
+    QMainWindow::resizeEvent(event);
+    updateHintGeometry();
+}
+
 bool MainWindow::loadVideoList()
 {
     const QDir videoDir(QString::fromUtf8(kVideoDirectory));
@@ -163,6 +182,7 @@ void MainWindow::playCurrentVideo()
 
     m_player->setMedia(QUrl::fromLocalFile(m_videoFiles.at(m_currentIndex)));
     m_player->play();
+    showTransientHint(QStringLiteral("播放：%1").arg(QFileInfo(m_videoFiles.at(m_currentIndex)).fileName()));
 }
 
 void MainWindow::playNextVideo()
@@ -189,8 +209,10 @@ void MainWindow::togglePlayback()
 {
     if (m_player->state() == QMediaPlayer::PlayingState) {
         m_player->pause();
+        showTransientHint(QStringLiteral("暂停"));
     } else {
         m_player->play();
+        showTransientHint(QStringLiteral("播放"));
     }
 }
 
@@ -200,4 +222,26 @@ void MainWindow::setSystemVolume(int volumePercent)
     QProcess::execute(QStringLiteral("amixer"),
                       {QStringLiteral("-c"), QStringLiteral("0"), QStringLiteral("set"), QStringLiteral("Master"),
                        QStringLiteral("%1%").arg(m_volumePercent)});
+    showTransientHint(QStringLiteral("音量 %1%").arg(m_volumePercent));
+}
+
+void MainWindow::showTransientHint(const QString &text)
+{
+    m_hintLabel->setText(text);
+    m_hintLabel->adjustSize();
+    updateHintGeometry();
+    m_hintLabel->show();
+    m_hintLabel->raise();
+    m_hintHideTimer->start(kHintAutoHideMs);
+}
+
+void MainWindow::updateHintGeometry()
+{
+    const int maxWidth = qMax(220, width() * 2 / 3);
+    m_hintLabel->setMaximumWidth(maxWidth);
+    m_hintLabel->adjustSize();
+
+    const int x = (width() - m_hintLabel->width()) / 2;
+    const int y = qMax(20, height() / 10);
+    m_hintLabel->move(x, y);
 }

@@ -5,8 +5,11 @@
 #include <QPoint>
 #include <QStringList>
 
+class QLabel;
 class QMediaPlayer;
 class QMouseEvent;
+class QResizeEvent;
+class QTimer;
 class QVideoWidget;
 
 class MainWindow : public QMainWindow
@@ -22,6 +25,7 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void mouseDoubleClickEvent(QMouseEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
 
 private:
     bool loadVideoList();
@@ -30,9 +34,13 @@ private:
     void playPreviousVideo();
     void togglePlayback();
     void setSystemVolume(int volumePercent);
+    void showTransientHint(const QString &text);
+    void updateHintGeometry();
 
     QMediaPlayer *m_player;
     QVideoWidget *m_videoWidget;
+    QLabel *m_hintLabel;
+    QTimer *m_hintHideTimer;
     QStringList m_videoFiles;
     int m_currentIndex;
     int m_volumePercent;
